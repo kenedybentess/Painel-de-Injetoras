@@ -37,5 +37,114 @@ Error generating stack: `+o.message+`
 </script>
   <script>(function(){function m(a){var h=a.getAttribute("href");if(!h)return;try{var u=new URL(h,document.baseURI);if((u.protocol==="http:"||u.protocol==="https:")&&u.host!==location.host){a.target="_blank";a.rel="noopener noreferrer";}}catch(e){}}function s(){document.querySelectorAll("a[href]").forEach(m);}if(document.readyState!=="loading"){s();}else{document.addEventListener("DOMContentLoaded",s);}document.addEventListener("click",function(e){var a=e.target&&e.target.closest&&e.target.closest("a[href]");if(a){m(a);}},true);})();</script>
   
+
+<!-- RECEIVER PAINEL-TV - puxa infos do index sem mudar estrutura -->
+<script>
+(function(){
+  const MIRROR_KEY = '__painel_tv_mirror__';
+  const CHANNEL_NAME = 'painel-tv-sync';
+  let channel;
+  try { channel = new BroadcastChannel(CHANNEL_NAME); } catch(e){}
+
+  function safeParse(v){
+    if(!v) return null;
+    try{ return JSON.parse(v); }catch(e){ return v; }
+  }
+
+  // Aplica os dados do index no localStorage local do painel
+  // assim o React do painel já enxerga como se fosse dele
+  function applyDataObject(obj, skipMirror){
+    if(!obj || typeof obj !== 'object') return;
+    try{
+      Object.keys(obj).forEach(k=>{
+        if(k==='__lastUpdate') return;
+        if(skipMirror && k===MIRROR_KEY) return;
+        let val = obj[k];
+        // se valor já é string, salva direto, se é objeto salva JSON
+        let toStore = typeof val === 'string' ? val : JSON.stringify(val);
+        // só escreve se mudou para evitar loop
+        try{
+          if(localStorage.getItem(k) !== toStore){
+            localStorage.setItem(k, toStore);
+          }
+        }catch(e){}
+      });
+      // avisa o app React do painel que chegou dado novo
+      window.__PAINEL_TV_DATA__ = obj;
+      window.dispatchEvent(new CustomEvent('painel-tv-update', {detail: obj}));
+      // compat: dispara storage event fake
+      window.dispatchEvent(new Event('storage-sync'));
+      console.log('[painel-tv] dados sincronizados do index', Object.keys(obj));
+    }catch(e){ console.warn('[painel-tv] erro apply', e); }
+  }
+
+  function loadFromMirror(){
+    try{
+      let raw = localStorage.getItem(MIRROR_KEY);
+      if(!raw) return false;
+      let mirror = JSON.parse(raw);
+      applyDataObject(mirror, false);
+      return true;
+    }catch(e){ return false; }
+  }
+
+  // 1. tenta carregar imediatamente (mesma origem = mesmo localStorage)
+  loadFromMirror();
+
+  // 2. escuta BroadcastChannel em tempo real
+  if(channel){
+    channel.onmessage = function(ev){
+      try{
+        let msg = ev.data;
+        if(!msg) return;
+        if(msg.type === 'storage' && msg.key){
+          let val = safeParse(msg.value);
+          let obj = {};
+          obj[msg.key] = val;
+          applyDataObject(obj, true);
+          // atualiza mirror local também
+          try{
+            let mirror = JSON.parse(localStorage.getItem(MIRROR_KEY)||'{}');
+            mirror[msg.key] = msg.value;
+            localStorage.setItem(MIRROR_KEY, JSON.stringify(mirror));
+          }catch(e){}
+        }else if(msg.type === 'full-sync' && msg.data){
+          applyDataObject(msg.data, true);
+        }
+      }catch(e){}
+    };
+  }
+
+  // 3. escuta storage event (caso navegador use abas diferentes)
+  window.addEventListener('storage', function(e){
+    if(e.key === MIRROR_KEY && e.newValue){
+      loadFromMirror();
+    } else if(e.key && e.key !== MIRROR_KEY){
+      // repassa mudança individual
+      let obj={}; obj[e.key]= safeParse(e.newValue);
+      window.__PAINEL_TV_DATA__ = {...(window.__PAINEL_TV_DATA__||{}), ...obj};
+      window.dispatchEvent(new CustomEvent('painel-tv-update', {detail: obj}));
+    }
+  });
+
+  // 4. fallback polling a cada 2s para TV que ficou aberta
+  setInterval(loadFromMirror, 2000);
+
+  // 5. expõe helper para debug / para o React usar
+  window.painelTvGetData = function(key){
+    try{
+      let mirror = JSON.parse(localStorage.getItem(MIRROR_KEY)||'{}');
+      if(key) {
+        let v = mirror[key];
+        return safeParse(v);
+      }
+      return mirror;
+    }catch(e){ return null; }
+  };
+
+  console.log('[painel-tv] receiver ativo - aguardando dados do index');
+})();
+</script>
+
 </body>
 </html>
