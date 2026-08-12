@@ -62,19 +62,7 @@ if(I&&I.storage&&P){
   
 
 <!-- BOTAO PAINEL-TV ADICIONADO SEM ALTERAR LOGICA DO INDEX -->
-<style>
-#btn-painel-tv-float{
- position:fixed; bottom:20px; right:20px; z-index:99999;
- background:#0ea5e9; color:white; padding:12px 18px; border-radius:999px;
- font-family:Inter, sans-serif; font-weight:600; font-size:14px;
- box-shadow:0 8px 24px rgba(14,165,233,.4); border:none; cursor:pointer;
- display:flex; align-items:center; gap:8px; text-decoration:none;
-}
-#btn-painel-tv-float:hover{background:#0284c7; transform:translateY(-1px)}
-</style>
-<a id="btn-painel-tv-float" href="painel-tv.html" target="_blank" title="Abrir Painel TV">
-  <span>📺</span> Painel TV
-</a>
+
 <script>
 // SYNC PARA PAINEL-TV - nao altera logica, so espelha dados
 (function(){
@@ -112,5 +100,89 @@ if(I&&I.storage&&P){
 })();
 </script>
 
+
+<!-- SYNC PAINEL-TV v2 - CORRIGIDO SEM ALTERAR ESTRUTURA -->
+<script>
+(function(){
+  try{
+    const MIRROR_KEY = '__painel_tv_mirror__';
+    const CHANNEL_NAME = 'painel-tv-sync';
+    let channel;
+    try{ channel = new BroadcastChannel(CHANNEL_NAME); }catch(e){}
+    const origSet = localStorage.setItem.bind(localStorage);
+    const origGet = localStorage.getItem.bind(localStorage);
+
+    // Função que salva mirror de forma segura (usa origSet para não entrar em loop)
+    function saveMirror(){
+      try{
+        let all={};
+        for(let i=0;i<localStorage.length;i++){
+          let k=localStorage.key(i);
+          if(!k || k===MIRROR_KEY) continue;
+          all[k]=localStorage.getItem(k);
+        }
+        all.__lastUpdate = Date.now();
+        origSet(MIRROR_KEY, JSON.stringify(all));
+        if(channel) channel.postMessage({type:'full-sync', data: all});
+        // também tenta postMessage para janelas filhas (funciona no file://)
+        try{
+          if(window._painelTvWindow && !window._painelTvWindow.closed){
+            window._painelTvWindow.postMessage({type:'painel-tv-sync', data: all}, '*');
+          }
+        }catch(e){}
+        return all;
+      }catch(e){ return null; }
+    }
+
+    // Override setItem - espelha tudo
+    localStorage.setItem = function(k,v){
+      origSet(k,v);
+      if(k===MIRROR_KEY) return;
+      try{
+        if(channel) channel.postMessage({type:'storage', key:k, value:v});
+        // postMessage fallback
+        try{
+          if(window._painelTvWindow && !window._painelTvWindow.closed){
+            let obj={}; obj[k]=v;
+            window._painelTvWindow.postMessage({type:'painel-tv-sync-single', key:k, value:v}, '*');
+          }
+        }catch(e){}
+        // salva mirror debounced
+        clearTimeout(window._saveMirrorTimeout);
+        window._saveMirrorTimeout = setTimeout(saveMirror, 300);
+      }catch(e){}
+    };
+
+    // Intercepta abertura do painel para guardar referência
+    const btn = document.getElementById('btn-painel-tv-float');
+    if(btn){
+      btn.addEventListener('click', function(e){
+        // se for file://, abre e guarda referência
+        try{
+          const w = window.open(this.getAttribute('href'), 'painel-tv');
+          window._painelTvWindow = w;
+          // envia dados assim que abrir
+          setTimeout(()=>{ let d=saveMirror(); if(w && d) w.postMessage({type:'painel-tv-sync', data:d}, '*'); }, 800);
+        }catch(err){}
+      });
+    }
+
+    // Responde a pedidos do painel
+    window.addEventListener('message', function(ev){
+      if(ev.data && ev.data.type==='painel-tv-request'){
+        let all = saveMirror();
+        if(all) ev.source.postMessage({type:'painel-tv-sync', data: all}, '*');
+      }
+    });
+
+    // Sync inicial + a cada 2s (corrigido usando origSet)
+    saveMirror();
+    setInterval(saveMirror, 2000);
+    console.log('[index] sync painel-tv v2 ativo');
+  }catch(e){ console.warn('sync index falhou', e); }
+})();
+</script>
+
+<style>#btn-painel-tv-float{position:fixed;bottom:20px;right:20px;z-index:99999;background:#0ea5e9;color:white;padding:12px 18px;border-radius:999px;font-family:Inter,sans-serif;font-weight:600;font-size:14px;box-shadow:0 8px 24px rgba(14,165,233,.4);border:none;cursor:pointer;display:flex;align-items:center;gap:8px;text-decoration:none}#btn-painel-tv-float:hover{background:#0284c7}</style><a id="btn-painel-tv-float" href="painel-tv.html" target="_blank">📺 Painel TV</a>
 </body>
 </html>
