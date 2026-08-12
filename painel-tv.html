@@ -3,189 +3,159 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Painel TV - Ao Vivo</title>
+<title>Painel TV - Injetoras AO VIVO</title>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800;900&display=swap" rel="stylesheet">
 <style>
 *{font-family:Inter,system-ui,sans-serif;box-sizing:border-box}
 body{margin:0;background:#020617;color:white;min-height:100vh;display:flex;flex-direction:column}
-header{padding:18px 28px;display:flex;justify-content:space-between;align-items:center;background:rgba(15,23,42,.8);backdrop-filter:blur(12px);border-bottom:1px solid rgba(255,255,255,.08);position:sticky;top:0;z-index:10}
+header{padding:14px 22px;display:flex;justify-content:space-between;align-items:center;background:rgba(15,23,42,.9);backdrop-filter:blur(12px);border-bottom:1px solid rgba(255,255,255,.08);position:sticky;top:0;z-index:10}
 .badge{padding:6px 12px;border-radius:999px;font-size:11px;font-weight:800;letter-spacing:.08em;text-transform:uppercase}
 .badge.ok{background:#10b981;color:#022c22;border:1px solid #34d399}
 .badge.wait{background:#f59e0b;color:#451a03;border:1px solid #fbbf24;animation:pulse 1.5s infinite}
+.badge.off{background:#334155;color:#94a3b8}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:.6}}
-main{flex:1;padding:24px;display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:18px;align-content:start}
-.card{background:#0f172a;border:1px solid rgba(255,255,255,.08);border-radius:20px;padding:20px;position:relative;overflow:hidden}
-.card h3{margin:0 0 12px;font-size:13px;letter-spacing:.12em;text-transform:uppercase;color:#94a3b8;font-weight:700}
-.card .big{font-size:42px;font-weight:900;letter-spacing:-.03em;line-height:1}
-.card .list{display:flex;flex-direction:column;gap:10px;max-height:70vh;overflow:auto}
-.item{padding:12px 14px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.06);border-radius:12px;display:flex;justify-content:space-between;gap:12px}
-.item b{color:#e2e8f0}
+main{flex:1;padding:16px;display:grid;grid-template-columns:repeat(auto-fit,minmax(360px,1fr));gap:14px;align-content:start;grid-auto-rows:300px}
+.card{border-radius:18px;padding:16px;position:relative;overflow:hidden;border:2px solid rgba(255,255,255,.08);display:flex;flex-direction:column;transition:.3s}
+.card.operando{background:linear-gradient(135deg,#064e3b,#065f46);border-color:#10b981;box-shadow:0 0 24px rgba(16,185,129,.25)}
+.card.parada{background:linear-gradient(135deg,#7f1d1d,#991b1b);border-color:#ef4444;box-shadow:0 0 24px rgba(239,68,68,.25);animation:blinkBorder 1.2s infinite}
+@keyframes blinkBorder{0%,100%{border-color:#ef4444}50%{border-color:#fca5a5}}
+.card-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
+.card h3{margin:0;font-size:28px;font-weight:900;letter-spacing:-.02em}
+.status-dot{width:12px;height:12px;border-radius:999px;display:inline-block}
+.status-dot.on{background:#10b981;box-shadow:0 0 10px #10b981}
+.status-dot.off{background:#ef4444;box-shadow:0 0 10px #ef4444;animation:ping 1s infinite}
+@keyframes ping{0%{transform:scale(1);opacity:1}100%{transform:scale(1.8);opacity:0}}
+.meta{font-size:12px;color:rgba(255,255,255,.7);line-height:1.4}
+.big{font-size:16px;font-weight:700;margin:6px 0}
+.photo{position:absolute;right:0;top:0;width:44%;height:100%;object-fit:cover;opacity:.28;mask-image:linear-gradient(to left, black 40%, transparent)}
+.turno{position:absolute;bottom:10px;right:12px;font-size:10px;letter-spacing:.15em;opacity:.6}
+footer{padding:10px 20px;font-size:11px;color:#475569;display:flex;justify-content:space-between;border-top:1px solid rgba(255,255,255,.06);background:#0f172a}
 .empty{grid-column:1/-1;display:grid;place-items:center;min-height:60vh;text-align:center;color:#64748b}
-.empty h1{font-size:56px;margin:0;color:#1e293b;font-weight:900}
-.kbd{background:#1e293b;border:1px solid #334155;border-bottom-width:2px;padding:2px 8px;border-radius:6px;font-size:12px}
-footer{padding:12px 24px;font-size:11px;color:#475569;display:flex;justify-content:space-between;border-top:1px solid rgba(255,255,255,.06)}
 </style>
 </head>
 <body>
 <header>
   <div style="display:flex;align-items:center;gap:12px">
-    <div style="width:36px;height:36px;background:#0ea5e9;border-radius:10px;display:grid;place-items:center;font-weight:900">TV</div>
+    <div style="width:40px;height:40px;background:#0ea5e9;border-radius:12px;display:grid;place-items:center;font-weight:900;font-size:18px">TV</div>
     <div>
-      <div style="font-weight:800;letter-spacing:-.02em">PAINEL TV AO VIVO</div>
-      <div style="font-size:11px;color:#64748b">puxando de index.html • <span id="last">nunca</span></div>
+      <div style="font-weight:900;letter-spacing:-.02em;font-size:18px">PAINEL TV - INJETORAS</div>
+      <div style="font-size:11px;color:#64748b">Firebase: painel-injetoras • <span id="last">conectando...</span></div>
     </div>
   </div>
-  <div id="status" class="badge wait">⏳ Aguardando index...</div>
+  <div style="display:flex;gap:8px;align-items:center">
+    <div id="count" class="badge off">0 máquinas</div>
+    <div id="status" class="badge wait">⏳ Conectando Firebase...</div>
+  </div>
 </header>
 <main id="root">
-  <div class="empty">
-    <div>
-      <h1>📺</h1>
-      <h2 style="color:white;margin:16px 0 8px">Aguardando dados do sistema principal</h2>
-      <p style="max-width:480px;margin:0 auto 18px;line-height:1.5">Abra o <span class="kbd">index.html</span> no mesmo navegador e clique no botão <span class="kbd">Painel TV</span> lá dentro. O painel precisa ser aberto PELO index para funcionar no modo arquivo.</p>
-      <p style="font-size:12px">Se já abriu, verifique se os dois estão na mesma pasta.</p>
-    </div>
-  </div>
+  <div class="empty"><div><h1 style="font-size:64px;margin:0">📡</h1><h2 style="color:white">Conectando ao Firebase...</h2><p id="debug">Tentando ler <code>machines</code> em tempo real</p></div></div>
 </main>
-<footer><span id="count">0 chaves</span><span id="origin">origem: -</span></footer>
+<footer><span id="foot1">painel-injetoras.firebaseapp.com</span><span id="foot2">auto-sync a cada 1s</span></footer>
 
+<!-- Firebase compat SDKs (mesma versão do index) -->
+<script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-database-compat.js"></script>
 <script>
-const KEY='__painel_tv_mirror__';
-const $status=document.getElementById('status');
-const $root=document.getElementById('root');
-const $last=document.getElementById('last');
-const $count=document.getElementById('count');
-const $origin=document.getElementById('origin');
-let lastData=null, hasData=false;
+const firebaseConfig = {
+  apiKey: "AIzaSyArMr4mFHcQH1sSTaJfg7wfyayeYVRA_ic",
+  authDomain: "painel-injetoras.firebaseapp.com",
+  databaseURL: "https://painel-injetoras-default-rtdb.firebaseio.com",
+  projectId: "painel-injetoras",
+  storageBucket: "painel-injetoras.appspot.com",
+  messagingSenderId: "332778152216",
+  appId: "1:332778152216:web:d16a458b22bf3c9eaffe6d"
+};
+if(!firebase.apps.length) firebase.initializeApp(firebaseConfig);
+const db = firebase.database();
 
-function fmtTime(ts){
-  if(!ts) return 'agora';
-  const d=new Date(ts);
-  return d.toLocaleTimeString('pt-BR');
+const $root = document.getElementById('root');
+const $status = document.getElementById('status');
+const $count = document.getElementById('count');
+const $last = document.getElementById('last');
+const $debug = document.getElementById('debug');
+
+function fmtDur(ms){
+  if(!ms || ms<0) return '—';
+  const s=Math.floor(ms/1000);
+  const h=Math.floor(s/3600), m=Math.floor((s%3600)/60), sec=s%60;
+  if(h>0) return `${h}h ${m}m`;
+  if(m>0) return `${m}m ${sec}s`;
+  return `${sec}s`;
 }
-function safeParse(v){
-  if(v==null) return v;
-  if(typeof v!=='string') return v;
-  const t=v.trim();
-  if((t.startsWith('{')&&t.endsWith('}'))||(t.startsWith('[')&&t.endsWith(']'))||(t.startsWith('"')&&t.endsWith('"'))){
-    try{ return JSON.parse(v); }catch(e){ return v; }
-  }
-  return v;
-}
-function render(data){
-  if(!data || Object.keys(data).length<=1){
-    $status.textContent='⏳ Sem dados'; $status.className='badge wait'; return;
-  }
-  lastData=data;
-  hasData=true;
-  const ts=data.__lastUpdate||Date.now();
-  $last.textContent=fmtTime(ts);
-  $status.textContent='✅ Ao vivo • '+fmtTime(ts);
+function renderMachines(data){
+  if(!data){ $root.innerHTML='<div class="empty"><h2>Sem máquinas</h2></div>'; return; }
+  const arr = Object.entries(data).map(([id, v])=>({id, ...v})).sort((a,b)=>a.id.localeCompare(b.id));
+  $count.textContent = arr.length+' máquinas';
+  $count.className='badge ok';
+  $status.textContent='✅ Ao vivo';
   $status.className='badge ok';
-  $count.textContent=Object.keys(data).length+' chaves sincronizadas';
-  $origin.textContent='origem: '+(data.__origin||'index');
+  $last.textContent = new Date().toLocaleTimeString('pt-BR');
 
-  // Tenta detectar chaves importantes do seu sistema
-  const keys=Object.keys(data).filter(k=>!k.startsWith('__'));
-  let html='';
-
-  // Renderiza de forma inteligente: se valor for array de objetos, mostra lista
-  keys.forEach(k=>{
-    const raw=data[k];
-    const val=safeParse(raw);
-    if(!val) return;
-    if(Array.isArray(val)){
-      html+=`<div class="card"><h3>${k} • ${val.length}</h3><div class="list">`+
-        val.slice(0,30).map((it,i)=>{
-          if(typeof it==='object'){
-            const title=it.nome||it.name||it.title||it.cliente||it.senha||it.numero||`#${i+1}`;
-            const sub=it.status||it.horario||it.valor||it.total||JSON.stringify(it).slice(0,80);
-            return `<div class="item"><b>${title}</b><span style="color:#94a3b8;font-size:12px">${sub}</span></div>`;
-          } else {
-            return `<div class="item"><b>${it}</b></div>`;
-          }
-        }).join('')+`</div></div>`;
-    } else if(typeof val==='object'){
-      // objeto único
-      const entries=Object.entries(val).slice(0,20);
-      html+=`<div class="card"><h3>${k}</h3><div class="list">`+
-        entries.map(([a,b])=>`<div class="item"><b>${a}</b><span>${typeof b==='object'?JSON.stringify(b).slice(0,60):b}</span></div>`).join('')+`</div></div>`;
-    } else {
-      // valor simples
-      if(k.length>30) return; // ignora chaves gigantes
-      html+=`<div class="card" style="min-height:120px"><h3>${k}</h3><div class="big">${val}</div></div>`;
-    }
-  });
-
-  if(!html){
-    html=`<div class="card" style="grid-column:1/-1"><h3>Dados brutos</h3><pre style="white-space:pre-wrap;font-size:12px;color:#cbd5e1;max-height:60vh;overflow:auto">${JSON.stringify(data,null,2).slice(0,8000)}</pre></div>`;
-  }
-  $root.innerHTML=html;
+  $root.innerHTML = arr.map(m=>{
+    const isOn = m.status==='EM_OPERACAO';
+    const since = m.runningSince || m.lastStart || m.lastStop;
+    const dur = since ? fmtDur(Date.now()-since) : '—';
+    const operador = m.lastOperator || m.operator || '—';
+    const motivo = m.lastStopReason || m.motivo || '';
+    const foto = m.lastStopPhotoUrl || '';
+    return `<div class="card ${isOn?'operando':'parada'}">
+      ${foto?`<img class="photo" src="${foto}" onerror="this.style.display='none'">`:''}
+      <div class="card-header">
+        <h3>${m.name||m.id}</h3>
+        <span class="status-dot ${isOn?'on':'off'}"></span>
+      </div>
+      <div class="meta">
+        <div class="big">${isOn?'🟢 EM OPERAÇÃO':'🔴 PARADA'} ${motivo?'- '+motivo:''}</div>
+        <div>⏱️ ${isOn?'Rodando há':'Parada há'}: <b>${dur}</b></div>
+        <div>👷 Operador: <b>${operador}</b></div>
+        ${m.produto?`<div>📦 Produto: ${m.produto}</div>`:''}
+        ${m.molde?`<div>🧩 Molde: ${m.molde}</div>`:''}
+      </div>
+      <div class="turno">${m.id} • ${fmtDur(Date.now()-(m.lastStart||0))}</div>
+    </div>`;
+  }).join('');
 }
 
-function tryLoad(){
+// Conecta no Firebase igual o index faz
+db.ref('machines').on('value', (snap)=>{
+  const val = snap.val();
+  console.log('[painel-tv] Firebase machines:', val);
+  renderMachines(val);
+}, (err)=>{
+  console.error(err);
+  $status.textContent='❌ Erro Firebase: '+err.message;
+  $status.className='badge wait';
+});
+
+// Fallback: também escuta localStorage mirror (caso index esteja em file:// sem internet)
+function tryMirror(){
   try{
-    const raw=localStorage.getItem(KEY);
-    if(raw){
-      const data=JSON.parse(raw);
-      if(data.__lastUpdate && (!lastData || data.__lastUpdate!==lastData.__lastUpdate)){
-        render(data);
-        return true;
-      } else if(!hasData){
-        render(data);
-      }
+    const raw=localStorage.getItem('__painel_tv_mirror__');
+    if(!raw) return;
+    const mirror=JSON.parse(raw);
+    // tenta achar machines dentro do mirror
+    let machines=null;
+    for(let k of Object.keys(mirror)){
+      try{
+        const v=JSON.parse(mirror[k]);
+        if(v && typeof v==='object' && v['INJ-01']){
+          machines=v; break;
+        }
+        if(k==='machines'){ machines=v; break; }
+      }catch(e){}
     }
+    if(machines) renderMachines(machines);
   }catch(e){}
-  return false;
 }
+setInterval(tryMirror, 2000);
 
-// 1. BroadcastChannel
-try{
-  const bc=new BroadcastChannel('painel-tv-sync');
-  bc.onmessage=(ev)=>{
-    const m=ev.data;
-    if(!m) return;
-    if(m.type==='full-sync' && m.data) render(m.data);
-    if(m.type==='single' && m.key){
-      const cur=JSON.parse(localStorage.getItem(KEY)||'{}');
-      cur[m.key]=m.value; cur.__lastUpdate=Date.now();
-      localStorage.setItem(KEY, JSON.stringify(cur));
-      tryLoad();
-    }
-  };
-}catch(e){}
-
-// 2. postMessage do index
+// Também escuta postMessage do index (file://)
 window.addEventListener('message', (ev)=>{
   const d=ev.data;
   if(d && d.type==='PAINEL_TV_DATA' && d.payload){
-    try{ localStorage.setItem(KEY, JSON.stringify(d.payload)); }catch(e){}
-    render(d.payload);
+    tryMirror();
   }
 });
-
-// 3. Pede dados para o opener
-function ask(){
-  try{
-    if(window.opener && !window.opener.closed){
-      window.opener.postMessage({type:'PAINEL_TV_REQUEST'}, '*');
-    }
-    if(window.parent!==window){
-      window.parent.postMessage({type:'PAINEL_TV_REQUEST'}, '*');
-    }
-  }catch(e){}
-}
-setInterval(ask, 2000);
-ask();
-
-// 4. Polling localStorage
-setInterval(tryLoad, 800);
-tryLoad();
-
-// 5. storage event
-window.addEventListener('storage', (e)=>{ if(e.key===KEY) tryLoad(); });
-
-console.log('%c[painel-tv] v3 pronto - aguardando index', 'background:#0ea5e9;color:white;padding:4px 8px;border-radius:6px');
 </script>
 </body>
 </html>
