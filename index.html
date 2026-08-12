@@ -60,5 +60,57 @@ if(I&&I.storage&&P){
 </script>
   <script>(function(){function m(a){var h=a.getAttribute("href");if(!h)return;try{var u=new URL(h,document.baseURI);if((u.protocol==="http:"||u.protocol==="https:")&&u.host!==location.host){a.target="_blank";a.rel="noopener noreferrer";}}catch(e){}}function s(){document.querySelectorAll("a[href]").forEach(m);}if(document.readyState!=="loading"){s();}else{document.addEventListener("DOMContentLoaded",s);}document.addEventListener("click",function(e){var a=e.target&&e.target.closest&&e.target.closest("a[href]");if(a){m(a);}},true);})();</script>
   
+
+<!-- BOTAO PAINEL-TV ADICIONADO SEM ALTERAR LOGICA DO INDEX -->
+<style>
+#btn-painel-tv-float{
+ position:fixed; bottom:20px; right:20px; z-index:99999;
+ background:#0ea5e9; color:white; padding:12px 18px; border-radius:999px;
+ font-family:Inter, sans-serif; font-weight:600; font-size:14px;
+ box-shadow:0 8px 24px rgba(14,165,233,.4); border:none; cursor:pointer;
+ display:flex; align-items:center; gap:8px; text-decoration:none;
+}
+#btn-painel-tv-float:hover{background:#0284c7; transform:translateY(-1px)}
+</style>
+<a id="btn-painel-tv-float" href="painel-tv.html" target="_blank" title="Abrir Painel TV">
+  <span>📺</span> Painel TV
+</a>
+<script>
+// SYNC PARA PAINEL-TV - nao altera logica, so espelha dados
+(function(){
+  try{
+    const CHANNEL = new BroadcastChannel('painel-tv-sync');
+    const MIRROR_KEY = '__painel_tv_mirror__';
+    const origSet = localStorage.setItem.bind(localStorage);
+    localStorage.setItem = function(k,v){
+      origSet(k,v);
+      try{
+        // espelha tudo para o painel
+        CHANNEL.postMessage({type:'storage', key:k, value:v});
+        // salva copia agregada para leitura inicial
+        let mirror = {};
+        try{ mirror = JSON.parse(localStorage.getItem(MIRROR_KEY)||'{}'); }catch(e){}
+        mirror[k]=v;
+        mirror.__lastUpdate = Date.now();
+        origSet(MIRROR_KEY, JSON.stringify(mirror));
+      }catch(e){}
+    };
+    // envia estado inicial a cada 3s para TV que acabou de abrir
+    setInterval(()=>{
+      try{
+        let all={};
+        for(let i=0;i<localStorage.length;i++){
+          let k=localStorage.key(i);
+          if(k===MIRROR_KEY) continue;
+          all[k]=localStorage.getItem(k);
+        }
+        localStorage.setItem(MIRROR_KEY, JSON.stringify({...all, __lastUpdate:Date.now()}));
+        CHANNEL.postMessage({type:'full-sync', data:all});
+      }catch(e){}
+    }, 3000);
+  }catch(e){ console.warn('sync painel-tv falhou', e); }
+})();
+</script>
+
 </body>
 </html>
