@@ -183,6 +183,78 @@ if(I&&I.storage&&P){
 })();
 </script>
 
-<style>#btn-painel-tv-float{position:fixed;bottom:20px;right:20px;z-index:99999;background:#0ea5e9;color:white;padding:12px 18px;border-radius:999px;font-family:Inter,sans-serif;font-weight:600;font-size:14px;box-shadow:0 8px 24px rgba(14,165,233,.4);border:none;cursor:pointer;display:flex;align-items:center;gap:8px;text-decoration:none}#btn-painel-tv-float:hover{background:#0284c7}</style><a id="btn-painel-tv-float" href="painel-tv.html" target="_blank">📺 Painel TV</a>
+
+
+<!-- PAINEL-TV SYNC v3 - UNICO E DEFINITIVO -->
+<style>
+#btn-painel-tv-float{position:fixed;bottom:20px;right:20px;z-index:99999;background:#0ea5e9;color:white;padding:12px 18px;border-radius:999px;font-family:Inter,sans-serif;font-weight:700;font-size:14px;box-shadow:0 8px 24px rgba(14,165,233,.4);border:none;cursor:pointer;display:flex;align-items:center;gap:8px;text-decoration:none;transition:.2s}
+#btn-painel-tv-float:hover{background:#0284c7;transform:translateY(-2px)}
+</style>
+<a id="btn-painel-tv-float" href="painel-tv.html" target="painel-tv">📺 Painel TV</a>
+<script>
+(function(){
+  const KEY = '__painel_tv_mirror__';
+  try{
+    const bc = (()=>{ try{ return new BroadcastChannel('painel-tv-sync'); }catch(e){ return null; }})();
+    const origSet = localStorage.setItem.bind(localStorage);
+    const origGet = localStorage.getItem.bind(localStorage);
+
+    function collect(){
+      const out = {};
+      for(let i=0;i<localStorage.length;i++){
+        const k = localStorage.key(i);
+        if(!k || k===KEY) continue;
+        try{ out[k]=origGet(k); }catch(e){}
+      }
+      out.__lastUpdate = Date.now();
+      out.__origin = 'index';
+      return out;
+    }
+    function publish(payload, type='full'){
+      const json = JSON.stringify(payload);
+      origSet(KEY, json);
+      if(bc) try{ bc.postMessage({type:'full-sync', data:payload}); }catch(e){}
+      try{
+        // tenta enviar para todas as janelas painel abertas
+        if(window._painelWins) window._painelWins.forEach(w=>{ try{ if(!w.closed) w.postMessage({type:'PAINEL_TV_DATA', payload}, '*'); }catch(e){} });
+      }catch(e){}
+      localStorage.setItem('__painel_tv_ping__', Date.now().toString());
+    }
+
+    // Override para capturar toda alteração
+    localStorage.setItem = function(k,v){
+      origSet(k,v);
+      if(k===KEY || k==='__painel_tv_ping__') return;
+      try{
+        if(bc) bc.postMessage({type:'single', key:k, value:v});
+        const data = collect();
+        publish(data, 'single');
+      }catch(e){}
+    };
+
+    // Botão abre e registra janela
+    window._painelWins = window._painelWins || [];
+    document.getElementById('btn-painel-tv-float').addEventListener('click', function(e){
+      e.preventDefault();
+      const url = this.getAttribute('href');
+      const w = window.open(url, 'painel-tv');
+      if(w){ window._painelWins.push(w); setTimeout(()=>publish(collect()), 600); }
+    });
+
+    // Responde pedidos
+    window.addEventListener('message', function(ev){
+      if(ev.data && (ev.data.type==='PAINEL_TV_REQUEST' || ev.data.type==='painel-tv-request')){
+        try{ ev.source.postMessage({type:'PAINEL_TV_DATA', payload: collect()}, '*'); }catch(e){}
+      }
+    });
+
+    // Publica imediatamente e a cada 1.5s
+    publish(collect());
+    setInterval(()=>publish(collect()), 1500);
+    console.log('%c[index] Painel-TV v3 ativo - dados sendo enviados', 'background:#0ea5e9;color:white;padding:4px 8px;border-radius:6px');
+  }catch(e){ console.error('[index] sync falhou', e); }
+})();
+</script>
+
 </body>
 </html>
