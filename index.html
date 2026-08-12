@@ -3,217 +3,141 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Painel Injetoras - Oficial</title>
+<title>Painel Injetoras - Corrigido</title>
 <script src="https://cdn.tailwindcss.com"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-storage-compat.js"></script>
-<style>*{font-family:Inter, sans-serif} @keyframes slideUp{from{transform:translateY(12px);opacity:0}to{transform:translateY(0);opacity:1}}}</style>
+<style>*{font-family:Inter,sans-serif} @keyframes slideUp{from{transform:translateY(10px);opacity:0}to{transform:translateY(0);opacity:1}}</style>
 </head>
-<body class="bg-[#f8fafc] min-h-screen">
+<body class="bg-[#f6f7fb] min-h-screen">
 <div id="root"></div>
 <script type="module">
 import { createElement as h, useState, useEffect, useRef } from 'https://esm.sh/react@18.3.1';
 import { createRoot } from 'https://esm.sh/react-dom@18.3.1/client';
-
 const firebaseConfig = {
   apiKey: "AIzaSyArMr4mFHcQH1sSTaJfg7wfyayeYVRA_ic",
   authDomain: "painel-injetoras.firebaseapp.com",
   databaseURL: "https://painel-injetoras-default-rtdb.firebaseio.com",
   projectId: "painel-injetoras",
-  storageBucket: "painel-injetoras.firebasestorage.app",
+  storageBucket: "painel-injetoras.appspot.com",
   messagingSenderId: "332778152216",
-  appId: "1:332778152216:web:d16a458b22bf3c9eaffe6d",
-  measurementId: "G-2V4DHDG99R"
+  appId: "1:332778152216:web:d16a458b22bf3c9eaffe6d"
 };
-
 firebase.initializeApp(firebaseConfig);
 const db = firebase.database();
 const storage = firebase.storage();
 
 function App(){
-  const [injetoras, setInjetoras] = useState([]);
-  const [filter, setFilter] = useState('TODAS');
-  const [showStopModal, setShowStopModal] = useState(null);
-  const [reason, setReason] = useState('Manutenção');
-  const [detail, setDetail] = useState('');
-  const [photoFile, setPhotoFile] = useState(null);
-  const [photoPreview, setPhotoPreview] = useState(null);
-  const [uploading, setUploading] = useState(false);
-  const [toast, setToast] = useState(null);
-  const fileInputRef = useRef();
+  const [injetoras,setInjetoras]=useState([]);
+  const [filter,setFilter]=useState('TODAS');
+  const [modal,setModal]=useState(null);
+  const [reason,setReason]=useState('Manutenção');
+  const [detail,setDetail]=useState('');
+  const [file,setFile]=useState(null);
+  const [preview,setPreview]=useState(null);
+  const [uploading,setUploading]=useState(false);
+  const [toast,setToast]=useState(null);
+  const fileRef=useRef();
+  const [log,setLog]=useState([]);
+
+  const addLog = (m)=> setLog(l=>[...l.slice(-4), m]);
 
   useEffect(()=>{
-    const ref = db.ref('injetoras');
-    ref.on('value', snap=>{
-      const val = snap.val();
-      if(val){
-        setInjetoras(Object.values(val));
-      } else {
-        const iniciais = {};
-        Array.from({length:8}, (_,i)=>{
-          const id = `INJ-${String(i+1).padStart(2,'0')}`;
-          iniciais[id] = {
-            id,
-            name: `Injetora ${String(i+1).padStart(2,'0')}`,
-            status: Math.random()>0.5?'EM_OPERACAO':'PARADA',
-            operator: 'Roberto Alves',
-            stoppedAt: Date.now() - Math.random()*3600000*5,
-            lastStopPhoto: null,
-            lastStopReason: null,
-            isCloud: false
-          };
+    const ref=db.ref('injetoras');
+    ref.on('value',snap=>{
+      const v=snap.val();
+      if(v) setInjetoras(Object.values(v));
+      else{
+        const init={};
+        Array.from({length:8},(_,i)=>{
+          const id=`INJ-${String(i+1).padStart(2,'0')}`;
+          init[id]={id,name:`Injetora ${String(i+1).padStart(2,'0')}`,status:Math.random()>0.5?'EM_OPERACAO':'PARADA',operator:'Roberto Alves',stoppedAt:Date.now(),lastStopPhoto:null,lastStopReason:null,isCloud:false};
         });
-        db.ref('injetoras').set(iniciais);
+        db.ref('injetoras').set(init);
       }
     });
-    return ()=> ref.off();
+    return ()=>ref.off();
   },[]);
 
-  function showToast(msg, type='success'){
-    setToast({msg, type});
-    setTimeout(()=>setToast(null), 4000);
-  }
+  function showToast(m,t='ok'){ setToast({m,t}); setTimeout(()=>setToast(null),3500); }
 
-  async function compressImage(file){
-    const bitmap = await createImageBitmap(file);
-    const canvas = document.createElement('canvas');
-    const maxW = 800;
-    canvas.width = maxW;
-    canvas.height = (bitmap.height / bitmap.width) * maxW;
-    const ctx = canvas.getContext('2d');
-    ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
-    return new Promise(res=>canvas.toBlob(b=>res(b), 'image/webp', 0.7));
-  }
-
-  function handleFile(e){
-    const file = e.target.files[0];
-    if(!file) return;
-    setPhotoFile(file);
-    setPhotoPreview(URL.createObjectURL(file));
-  }
-
-  async function confirmarParada(){
-    if(!photoFile){ showToast('Foto obrigatória! Tire uma foto','error'); return; }
-    setUploading(true);
+  async function compress(f){
     try{
-      const compressed = await compressImage(photoFile);
-      const path = `paradas/${showStopModal.id}/${Date.now()}.webp`;
-      const ref = storage.ref(path);
-      const snap = await ref.put(compressed);
-      const downloadURL = await snap.ref.getDownloadURL();
-
-      const updated = {
-        ...showStopModal,
-        status: 'PARADA',
-        stoppedAt: Date.now(),
-        lastStopPhoto: downloadURL,
-        lastStopReason: reason,
-        lastStopDetail: detail,
-        lastStopAt: Date.now(),
-        isCloud: true
-      };
-
-      await db.ref(`injetoras/${showStopModal.id}`).set(updated);
-      await db.ref('logs').push({
-        injetoraId: showStopModal.id,
-        tipo: 'STOP',
-        motivo: reason,
-        detalhe: detail,
-        fotoUrl: downloadURL,
-        timestamp: firebase.database.ServerValue.TIMESTAMP
-      });
-
-      showToast('✅ Foto salva no banco! Agora aparece em outro dispositivo!');
-      setShowStopModal(null);
-      setPhotoFile(null);
-      setPhotoPreview(null);
-      setDetail('');
-    }catch(err){
-      console.error(err);
-      showToast('Erro: '+err.message+' - Verifique Rules do Storage','error');
-    }finally{
-      setUploading(false);
-    }
+      const bmp=await createImageBitmap(f);
+      const c=document.createElement('canvas');
+      c.width=800; c.height=(bmp.height/bmp.width)*800;
+      c.getContext('2d').drawImage(bmp,0,0,c.width,c.height);
+      return await new Promise(r=>c.toBlob(b=>r(b),'image/webp',0.7));
+    }catch(e){ return f; }
   }
 
-  async function iniciarInjetora(inj){
-    await db.ref(`injetoras/${inj.id}`).update({status:'EM_OPERACAO', startedAt: Date.now()});
+  async function confirmar(){
+    if(!file){ showToast('Tire uma foto!','err'); return; }
+    setUploading(true);
+    addLog('Comprimindo foto...');
+    try{
+      const blob=await compress(file);
+      addLog(`Tamanho: ${Math.round(blob.size/1024)}KB`);
+      const path=`paradas/${modal.id}/${Date.now()}.webp`;
+      addLog(`Enviando para ${path}...`);
+      const ref=storage.ref(path);
+      const snap=await ref.put(blob);
+      addLog('Upload OK, pegando URL...');
+      const url=await snap.ref.getDownloadURL();
+      addLog('URL OK: '+url.slice(0,40)+'...');
+      const upd={...modal,status:'PARADA',stoppedAt:Date.now(),lastStopPhoto:url,lastStopReason:reason,lastStopDetail:detail,lastStopAt:Date.now(),isCloud:true};
+      await db.ref(`injetoras/${modal.id}`).set(upd);
+      await db.ref('logs').push({injetoraId:modal.id,tipo:'STOP',motivo:reason,detalhe:detail,fotoUrl:url,timestamp:firebase.database.ServerValue.TIMESTAMP});
+      showToast('Foto salva! Visível em outro dispositivo!');
+      setModal(null); setFile(null); setPreview(null); setDetail('');
+    }catch(e){
+      console.error(e);
+      addLog(`ERRO: ${e.code} ${e.message}`);
+      showToast(`Erro: ${e.message} - Verifique Rules do Storage`,'err');
+    }finally{ setUploading(false); }
   }
 
-  const filtered = injetoras.filter(i=> filter==='TODAS' ? true : i.status===filter);
-
-  return h('div', {className:'max-w-[1280px] mx-auto p-4 md:p-6'},
-    h('div', {className:'bg-white rounded-[20px] shadow-sm border border-emerald-200 p-3 mb-6 flex items-center gap-2'},
-      h('div', {className:'w-2 h-2 bg-emerald-500 rounded-full animate-pulse'}),
-      h('span', {className:'text-[12px] font-medium text-emerald-700'}, '☁️ Conectado ao Firebase - painel-injetoras - Fotos salvas na nuvem e visíveis em todos os dispositivos')
+  const filtered=injetoras.filter(i=> filter==='TODAS'?true:i.status===filter);
+  return h('div',{className:'max-w-[1280px] mx-auto p-4'},
+    h('div',{className:'bg-emerald-50 border border-emerald-200 rounded-xl p-3 mb-4 flex gap-2 items-center'},
+      h('div',{className:'w-2 h-2 bg-emerald-500 rounded-full animate-pulse'}),
+      h('div',{className:'text-[11px] text-emerald-800'}, `Conectado: ${firebaseConfig.projectId} | Bucket: ${firebaseConfig.storageBucket} | Database: OK`)
     ),
-    h('div', {className:'bg-white rounded-[20px] shadow-sm border border-slate-200 p-6 mb-6 flex flex-wrap justify-between items-center gap-4'},
-      h('div', null,
-        h('h1', {className:'text-[22px] font-bold'}, 'Painel Injetoras'),
-        h('p', {className:'text-[13px] text-slate-500'}, `${injetoras.filter(i=>i.status==='EM_OPERACAO').length} em operação • ${injetoras.filter(i=>i.status==='PARADA').length} paradas`)
-      ),
-      h('div', {className:'flex gap-2'},
-        ['TODAS','EM_OPERACAO','PARADA'].map(f=> h('button', {key:f, onClick:()=>setFilter(f), className:`px-3.5 py-2 rounded-full text-[13px] font-medium border ${filter===f?'bg-slate-900 text-white border-slate-900':'bg-white text-slate-600 border-slate-200'}`}, f==='EM_OPERACAO'?'EM OPERAÇÃO':f))
-      )
+    log.length>0 && h('div',{className:'bg-slate-900 text-[11px] text-white p-3 rounded-xl mb-4 font-mono'}, log.map((l,i)=>h('div',{key:i},l))),
+    h('div',{className:'bg-white rounded-[20px] border p-5 mb-5 flex justify-between flex-wrap gap-3'},
+      h('div',null,h('h1',{className:'font-bold text-[20px]'},'Painel Injetoras 2.0 - Corrigido'),h('p',{className:'text-[12px] text-slate-500'},`${filtered.length} injetoras`)),
+      h('div',{className:'flex gap-2'},['TODAS','EM_OPERACAO','PARADA'].map(f=>h('button',{key:f,onClick:()=>setFilter(f),className:`px-3 py-1.5 rounded-full text-[12px] border ${filter===f?'bg-slate-900 text-white':'bg-white'}`},f)))
     ),
-    h('div', {className:'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4'},
+    h('div',{className:'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4'},
       filtered.map(inj=>{
-        const tempo = inj.status==='PARADA' ? Math.floor((Date.now()-(inj.stoppedAt||Date.now()))/60000) : 0;
-        return h('div', {key:inj.id, className:`bg-white rounded-[20px] border p-5 shadow-sm flex flex-col gap-3 ${inj.status==='EM_OPERACAO'?'border-emerald-100':'border-amber-100'}`},
-          h('div', {className:'flex justify-between'},
-            h('div', null, h('div', {className:'font-mono font-bold'}, inj.id), h('div', {className:'text-[12px] text-slate-500'}, inj.name)),
-            h('span', {className:`text-[10px] px-2 py-1 rounded-full font-bold border ${inj.status==='EM_OPERACAO'?'bg-emerald-50 text-emerald-700 border-emerald-200':'bg-amber-50 text-amber-700 border-amber-200'}`}, inj.status)
-          ),
-          inj.lastStopPhoto ? h('div', {className:'relative rounded-[14px] overflow-hidden h-[180px] bg-slate-100'},
-            h('img', {src:inj.lastStopPhoto, className:'w-full h-full object-cover', alt:'parada'}),
-            h('div', {className:'absolute inset-0 bg-gradient-to-t from-black/70 to-transparent'}),
-            h('div', {className:'absolute bottom-2 left-2 right-2'},
-              h('div', {className:'text-[11px] text-white font-semibold'}, inj.lastStopReason),
-              h('div', {className:'flex justify-between items-center mt-1'},
-                h('span', {className:'text-[10px] text-white/80 truncate'}, inj.lastStopDetail||''),
-                h('span', {className:'text-[9px] bg-emerald-500 text-white px-1.5 py-0.5 rounded-full'}, '☁️ Banco')
-              )
-            )
-          ) : h('div', {className:'h-[60px] bg-slate-50 rounded-[14px] flex items-center justify-center text-[11px] text-slate-400'}, 'Sem foto de parada'),
-          h('div', {className:'text-[11px] text-slate-500'}, inj.status==='PARADA'?`Parada há ${tempo}min`:'Em operação'),
-          h('button', {onClick:()=> inj.status==='EM_OPERACAO'?setShowStopModal(inj):iniciarInjetora(inj), className:`w-full py-2.5 rounded-[12px] text-[13px] font-semibold text-white ${inj.status==='EM_OPERACAO'?'bg-amber-500 hover:bg-amber-600':'bg-emerald-500 hover:bg-emerald-600'}`}, inj.status==='EM_OPERACAO'?'■ Parar':'▶ Iniciar')
+        const t=inj.status==='PARADA'?Math.floor((Date.now()-(inj.stoppedAt||Date.now()))/60000):0;
+        return h('div',{key:inj.id,className:'bg-white rounded-[20px] border p-4 flex flex-col gap-3'},
+          h('div',{className:'flex justify-between'},h('div',null,h('div',{className:'font-mono font-bold text-[14px]'},inj.id),h('div',{className:'text-[11px] text-slate-500'},inj.name)),h('span',{className:`text-[10px] px-2 py-1 rounded-full font-bold border ${inj.status==='EM_OPERACAO'?'bg-emerald-50 text-emerald-700':'bg-amber-50 text-amber-700'}`},inj.status)),
+          inj.lastStopPhoto ? h('div',{className:'relative h-[170px] rounded-xl overflow-hidden bg-slate-100'},h('img',{src:inj.lastStopPhoto,className:'w-full h-full object-cover'}),h('div',{className:'absolute inset-0 bg-gradient-to-t from-black/60 to-transparent'}),h('div',{className:'absolute bottom-2 left-2 right-2 text-white'},h('div',{className:'text-[11px] font-bold'},inj.lastStopReason),h('div',{className:'text-[10px] opacity-80 truncate'},inj.lastStopDetail||''))) : h('div',{className:'h-[50px] bg-slate-50 rounded-xl grid place-items-center text-[11px] text-slate-400'},'Sem foto'),
+          h('div',{className:'text-[11px] text-slate-500'},inj.status==='PARADA'?`Parada há ${t}min`:'Em operação'),
+          h('button',{onClick:()=> inj.status==='EM_OPERACAO'?setModal(inj):db.ref(`injetoras/${inj.id}`).update({status:'EM_OPERACAO'}),className:`w-full py-2.5 rounded-xl text-[13px] font-bold text-white ${inj.status==='EM_OPERACAO'?'bg-amber-500':'bg-emerald-500'}`},inj.status==='EM_OPERACAO'?'■ Parar':'▶ Iniciar')
         )
       })
     ),
-    showStopModal && h('div', {className:'fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4'},
-      h('div', {className:'bg-white rounded-[20px] w-full max-w-[420px] p-6 shadow-2xl'},
-        h('h2', {className:'font-bold text-[18px] mb-4'}, `Parar ${showStopModal.id}`),
-        h('div', {className:'space-y-4'},
-          h('div', {className:'grid grid-cols-2 gap-2'},
-            ['Manutenção','Falta de material','Problema técnico','Limpeza','Fim de turno','Outro'].map(r=> h('button', {key:r, onClick:()=>setReason(r), className:`text-[12px] px-3 py-2 rounded-[10px] border ${reason===r?'bg-slate-900 text-white':'bg-white border-slate-200'}`}, r))
+    modal && h('div',{className:'fixed inset-0 bg-black/50 z-50 grid place-items-center p-4'},
+      h('div',{className:'bg-white rounded-[20px] w-full max-w-[400px] p-5 animate-[slideUp_.2s]'},
+        h('h2',{className:'font-bold mb-3'},`Parar ${modal.id}`),
+        h('div',{className:'space-y-3'},
+          h('div',{className:'grid grid-cols-2 gap-2'},['Manutenção','Falta de material','Problema técnico','Limpeza','Fim de turno','Outro'].map(r=>h('button',{key:r,onClick:()=>setReason(r),className:`text-[12px] p-2 rounded-lg border ${reason===r?'bg-slate-900 text-white':'bg-white'}`},r))),
+          h('textarea',{value:detail,onInput:e=>setDetail(e.target.value),placeholder:'Detalhe',className:'w-full border rounded-xl p-2 text-[13px]'}),
+          h('div',{className:'border-2 border-dashed rounded-xl p-3'},
+            preview ? h('div',null,h('img',{src:preview,className:'w-full h-[180px] object-cover rounded-lg'}),h('button',{onClick:()=>{setPreview(null);setFile(null)},className:'text-[11px] text-red-500 mt-2'},'Remover')) :
+            h('div',{className:'text-center'},h('div',{className:'text-[12px] mb-2'},'Foto obrigatória - salva no banco'),h('button',{onClick:()=>fileRef.current.click(),className:'px-4 py-2 bg-slate-900 text-white rounded-lg text-[12px]'},'Tirar Foto / Galeria'),h('input',{ref:fileRef,type:'file',accept:'image/*',capture:'environment',className:'hidden',onChange:e=>{const f=e.target.files[0]; if(f){setFile(f); setPreview(URL.createObjectURL(f))}}}))
           ),
-          h('textarea', {placeholder:'Detalhe (opcional)', value:detail, onInput:e=>setDetail(e.target.value), className:'w-full border rounded-[12px] p-3 text-[13px] min-h-[60px]'}),
-          h('div', {className:'border-2 border-dashed rounded-[14px] p-4'},
-            photoPreview ? h('div', null,
-              h('img', {src:photoPreview, className:'w-full h-[200px] object-cover rounded-[10px]'}),
-              h('button', {onClick:()=>{setPhotoPreview(null); setPhotoFile(null);}, className:'text-[11px] text-red-500 mt-2'}, 'Remover')
-            ) : h('div', {className:'text-center'},
-              h('div', {className:'text-[13px] text-slate-500 mb-2'}, '📸 Foto obrigatória - vai aparecer em outro celular'),
-              h('div', {className:'flex gap-2 justify-center'},
-                h('button', {onClick:()=>fileInputRef.current.click(), className:'px-4 py-2 bg-slate-900 text-white rounded-[10px] text-[13px]'}, 'Tirar Foto'),
-                h('button', {onClick:()=>fileInputRef.current.click(), className:'px-4 py-2 border rounded-[10px] text-[13px]'}, 'Galeria')
-              ),
-              h('input', {ref:fileInputRef, type:'file', accept:'image/*', capture:'environment', className:'hidden', onChange:handleFile})
-            )
-          ),
-          h('div', {className:'flex gap-2'},
-            h('button', {onClick:()=>{setShowStopModal(null); setPhotoPreview(null); setPhotoFile(null);}, className:'flex-1 py-3 border rounded-[12px] text-[13px]'}, 'Cancelar'),
-            h('button', {onClick:confirmarParada, disabled:uploading||!photoFile, className:`flex-1 py-3 rounded-[12px] text-[13px] font-semibold text-white ${uploading||!photoFile?'bg-gray-200 text-gray-400':'bg-red-600'}`}, uploading?'Enviando para Storage...':'Confirmar com Foto')
-          )
+          h('div',{className:'flex gap-2'},h('button',{onClick:()=>{setModal(null);setPreview(null);setFile(null)},className:'flex-1 py-3 border rounded-xl text-[13px]'},'Cancelar'),h('button',{onClick:confirmar,disabled:uploading||!file,className:`flex-1 py-3 rounded-xl text-[13px] font-bold text-white ${uploading||!file?'bg-gray-300':'bg-red-600'}`},uploading?'Enviando...':'Confirmar'))
         )
       )
     ),
-    toast && h('div', {className:`fixed bottom-5 left-5 right-5 md:left-auto md:w-[400px] p-4 rounded-[14px] shadow-2xl z-[70] text-[13px] font-medium ${toast.type==='error'?'bg-red-600 text-white':'bg-slate-900 text-white'}`}, toast.msg)
+    toast && h('div',{className:`fixed bottom-4 left-4 right-4 md:left-auto md:w-[380px] p-4 rounded-xl shadow-xl text-[13px] z-50 ${toast.t==='err'?'bg-red-600 text-white':'bg-slate-900 text-white'}`},toast.m)
   )
 }
-
 createRoot(document.getElementById('root')).render(h(App));
 </script>
 </body>
