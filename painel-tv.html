@@ -13,20 +13,20 @@ header{padding:14px 22px;display:flex;justify-content:space-between;align-items:
 .badge.ok{background:#10b981;color:#022c22;border:1px solid #34d399}
 .badge.wait{background:#f59e0b;color:#451a03;border:1px solid #fbbf24;animation:pulse 1.5s infinite}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:.6}}
-main{flex:1;padding:16px;display:grid;grid-template-columns:repeat(auto-fit,minmax(360px,1fr));gap:14px;align-content:start;grid-auto-rows:300px}
+main{flex:1;padding:16px;display:grid;grid-template-columns:repeat(auto-fit,minmax(380px,1fr));gap:14px;align-content:start;grid-auto-rows:320px}
 .card{border-radius:18px;padding:16px;position:relative;overflow:hidden;border:2px solid rgba(255,255,255,.08);display:flex;flex-direction:column;transition:.3s}
 .card.operando{background:linear-gradient(135deg,#064e3b,#065f46);border-color:#10b981;box-shadow:0 0 24px rgba(16,185,129,.25)}
-.card.parada{background:linear-gradient(135deg,#7f1d1d,#991b1b);border-color:#ef4444;box-shadow:0 0 24px rgba(239,68,68,.25);animation:blinkBorder 1.2s infinite}
-@keyframes blinkBorder{0%,100%{border-color:#ef4444}50%{border-color:#fca5a5}}
-.card-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
+.card.parada{background:linear-gradient(135deg,#7f1d1d,#991b1b);border-color:#ef4444;box-shadow:0 0 24px rgba(239,68,68,.25)}
+.card-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
 .card h3{margin:0;font-size:28px;font-weight:900;letter-spacing:-.02em}
 .status-dot{width:12px;height:12px;border-radius:999px;display:inline-block}
 .status-dot.on{background:#10b981;box-shadow:0 0 10px #10b981}
 .status-dot.off{background:#ef4444;box-shadow:0 0 10px #ef4444}
-.meta{font-size:12px;color:rgba(255,255,255,.8);line-height:1.5}
-.big{font-size:16px;font-weight:700;margin:6px 0}
-.photo{position:absolute;right:0;top:0;width:44%;height:100%;object-fit:cover;opacity:.28;mask-image:linear-gradient(to left, black 40%, transparent)}
-.turno{position:absolute;bottom:10px;right:12px;font-size:10px;letter-spacing:.15em;opacity:.6}
+.meta{font-size:13px;color:rgba(255,255,255,.85);line-height:1.6}
+.big{font-size:17px;font-weight:800;margin:6px 0;letter-spacing:-.01em}
+.photo{position:absolute;right:0;top:0;width:44%;height:100%;object-fit:cover;opacity:.22;mask-image:linear-gradient(to left, black 40%, transparent)}
+.turno{position:absolute;bottom:10px;right:12px;font-size:10px;letter-spacing:.15em;opacity:.5}
+.start-badge{margin-top:8px;background:rgba(0,0,0,.35);border:1px solid rgba(255,255,255,.12);border-radius:10px;padding:8px 10px;display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:600}
 footer{padding:10px 20px;font-size:11px;color:#475569;display:flex;justify-content:space-between;border-top:1px solid rgba(255,255,255,.06);background:#0f172a}
 .empty{grid-column:1/-1;display:grid;place-items:center;min-height:60vh;text-align:center;color:#64748b}
 </style>
@@ -48,7 +48,7 @@ footer{padding:10px 20px;font-size:11px;color:#475569;display:flex;justify-conte
 <main id="root">
   <div class="empty"><div><h1 style="font-size:64px;margin:0">📡</h1><h2 style="color:white">Conectando ao Firebase...</h2><p>Lendo <code>machines</code> em tempo real</p></div></div>
 </main>
-<footer><span>painel-injetoras.firebaseapp.com</span><span>sem "Fim de turno" em operação</span></footer>
+<footer><span>painel-injetoras.firebaseapp.com</span><span id="foot2"></span></footer>
 
 <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-database-compat.js"></script>
@@ -69,14 +69,30 @@ const $root=document.getElementById('root');
 const $status=document.getElementById('status');
 const $count=document.getElementById('count');
 const $last=document.getElementById('last');
+const $foot2=document.getElementById('foot2');
 
 function fmtDur(ms){
   if(!ms||ms<0) return '—';
   const s=Math.floor(ms/1000);
   const h=Math.floor(s/3600), m=Math.floor((s%3600)/60), sec=s%60;
-  if(h>0) return `${h}h ${m}m`;
+  if(h>0) return `${h}h ${m}m ${sec}s`;
   if(m>0) return `${m}m ${sec}s`;
   return `${sec}s`;
+}
+function fmtDateTime(ts){
+  if(!ts) return '—';
+  const d=new Date(ts);
+  return d.toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',year:'2-digit',hour:'2-digit',minute:'2-digit',second:'2-digit'});
+}
+function fmtDateOnly(ts){
+  if(!ts) return '—';
+  const d=new Date(ts);
+  return d.toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit',year:'numeric'});
+}
+function fmtTimeOnly(ts){
+  if(!ts) return '—';
+  const d=new Date(ts);
+  return d.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
 }
 
 function renderMachines(data){
@@ -85,19 +101,27 @@ function renderMachines(data){
   $count.textContent=arr.length+' máquinas';
   $status.textContent='✅ Ao vivo'; $status.className='badge ok';
   $last.textContent=new Date().toLocaleTimeString('pt-BR');
+  $foot2.textContent='Atualizado: '+new Date().toLocaleString('pt-BR');
 
   $root.innerHTML=arr.map(m=>{
     const isOn=m.status==='EM_OPERACAO';
     const since=m.runningSince||m.lastStart||m.lastStop;
     const dur=since?fmtDur(Date.now()-since):'—';
     const operador=m.lastOperator||'—';
-    // REGRA: quando EM OPERAÇÃO, NÃO mostra motivo Fim de turno nem nenhum outro
+    const startTs=m.runningSince||m.lastStart||null;
+    // Quando EM OPERAÇÃO, não mostra motivo Fim de turno
     let motivo='';
     if(!isOn){
       motivo=m.lastStopReason||m.motivo||'';
     }
     const foto=m.lastStopPhotoUrl||'';
     const statusText=isOn?'🟢 EM OPERAÇÃO':`🔴 PARADA${motivo?' - '+motivo:''}`;
+    
+    // Data e hora do start
+    const startDateStr = startTs ? fmtDateTime(startTs) : '—';
+    const startDateOnly = startTs ? fmtDateOnly(startTs) : '—';
+    const startTimeOnly = startTs ? fmtTimeOnly(startTs) : '—';
+
     return `<div class="card ${isOn?'operando':'parada'}">
       ${foto?`<img class="photo" src="${foto}" onerror="this.style.display='none'">`:''}
       <div class="card-header"><h3>${m.name||m.id}</h3><span class="status-dot ${isOn?'on':'off'}"></span></div>
@@ -105,6 +129,8 @@ function renderMachines(data){
         <div class="big">${statusText}</div>
         <div>⏱️ ${isOn?'Rodando há':'Parada há'}: <b>${dur}</b></div>
         <div>👷 Operador: <b>${operador}</b></div>
+        <div class="start-badge">▶️ Start: <b>${startDateStr}</b></div>
+        ${!isOn && m.lastStop ? `<div style="margin-top:6px">⏹️ Parada: <b>${fmtDateTime(m.lastStop)}</b></div>` : ''}
       </div>
       <div class="turno">${m.id} • ${dur}</div>
     </div>`;
@@ -117,6 +143,7 @@ db.ref('machines').on('value', snap=>{
   renderMachines(val);
 }, err=>{
   $status.textContent='❌ Erro: '+err.message;
+  $status.className='badge wait';
 });
 </script>
 </body>
